@@ -23,8 +23,16 @@ proc handlePacket(se: Server; idx: ClientId; pack: Packet) {.async.} =
   case pack.kind:
   of ptPosition:
     let msg = $pack
-    for id, client in se.clients:
-      if id != idx:
+    for id, client in se.clients.mpairs():
+      #echo $client.transform
+
+      if id == idx:
+        client.transform = (pos: (x: pack.pos.x,
+                                  y: pack.pos.y,
+                                  z: pack.pos.z),
+                            rot: (x: pack.pos.rx,
+                                  y: pack.pos.ry))
+      else:
         withSocketIfAlive(client):
           await socket.send(msg)
   else:

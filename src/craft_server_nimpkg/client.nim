@@ -1,4 +1,6 @@
-import asyncnet, options
+import
+  asyncnet, options,
+  vec
 
 type
   ClientId* = distinct Natural
@@ -6,6 +8,7 @@ type
   Client* = object
     ip: string
     socket: Option[AsyncSocket]
+    transform*: Pos3Rot2f
 
 proc `==`*(a, b: ClientId): bool {.borrow.}
 proc `$`*(idx: ClientId): string {.borrow.}

@@ -23,9 +23,9 @@ type
   Packet* = object
     case kind: PacketType
     of ptPosition:
-      pos: PkPosition
+      pos*: PkPosition
     of ptYou:
-      you: PkYou
+      you*: PkYou
 
 iterator countSplit(original: string not nil):
     tuple[idx: Natural, str: string not nil] =
