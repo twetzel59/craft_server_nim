@@ -12,13 +12,13 @@ type
     clients: Table[ClientId, Client]
     unusedIds: set[ClientId]
 
-proc sendInitial(idx: ClientId, cl: Client) {.async.} =
+proc sendInitial(se: Server; idx: ClientId; cl: Client) {.async.} =
   withSocketIfAlive(cl):
-    await socket.send($initPacket(PkYou(
-      id: idx,
-      x: 0, y: 0, z: 0,
-      rx: 0, ry: 0, 
-    )))
+    await socket.send($initPkYou(idx, cl.transform))
+
+    for id, client in se.clients:
+      if id != idx:
+        await socket.send($initPkPosition(id, client.transform))
 
 proc handlePacket(se: Server; idx: ClientId; pack: Packet) {.async.} =
   case pack.kind:
@@ -28,17 +28,12 @@ proc handlePacket(se: Server; idx: ClientId; pack: Packet) {.async.} =
       #echo $client.transform
 
       if id == idx:
-        client.transform = (pos: (x: pack.pos.x,
-                                  y: pack.pos.y,
-                                  z: pack.pos.z),
-                            rot: (x: pack.pos.rx,
-                                  y: pack.pos.ry))
+        client.transform = pack.pos.toPos3Rot2f()
       else:
         withSocketIfAlive(client):
           await socket.send(msg)
   else:
     discard
-
 
 proc clientLoop(se: Server; idx: ClientId) {.async.} =
   template cl(): untyped = se.clients[idx]
@@ -80,7 +75,7 @@ proc listenIncoming(se: Server) {.async.} =
 
       let idx = se.nextClientId()
       let client = initClient(clientAddr, clientSocket)
-      asyncCheck sendInitial(idx, client)
+      asyncCheck sendInitial(se, idx, client)
       se.clients.add(idx, client)
       asyncCheck se.clientLoop(idx)
 

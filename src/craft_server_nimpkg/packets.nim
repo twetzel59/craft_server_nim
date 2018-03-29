@@ -1,6 +1,9 @@
 import
   options, strformat, strutils,
-  client, utils
+  client, utils, vec
+from client import ClientId
+from utils import notNilOrDie
+from vec import nil
 
 const
   DELIMITER = ','
@@ -34,11 +37,31 @@ iterator countSplit(original: string not nil):
     yield (idx: counter.Natural, str: notNilOrDie i)
     inc counter
 
+template kind*(p: Packet): PacketType =
+  p.kind
+
+converter toPos3Rot2f*(p: PkPosition): vec.Pos3Rot2f =
+  (pos: (x: p.x, y: p.y, z: p.z), rot: (x: p.rx, y: p.ry))
+
 proc initPacket*(p: PkPosition): Packet =
   result = Packet(kind: ptPosition, pos: p)
 
 proc initPacket*(u: PkYou): Packet =
   result = Packet(kind: ptYou, you: u)
+
+proc initPkPosition*(id: ClientId; transform: Pos3Rot2f): PkPosition =
+  PkPosition(
+    id: id,
+    x: transform.pos.x, y: transform.pos.y, z: transform.pos.z,
+    rx: transform.rot.x, ry: transform.rot.y
+  )
+
+proc initPkYou*(id: ClientId; transform: Pos3Rot2f): PkYou =
+  PkYou(
+    id: id,
+    x: transform.pos.x, y: transform.pos.y, z: transform.pos.z,
+    rx: transform.rot.x, ry: transform.rot.y
+  )
 
 proc `$`*(p: PkPosition): string not nil =
   result = notNilOrDie(&"P,{p.id},{p.x},{p.y},{p.z},{p.rx},{p.ry}\n")
@@ -52,9 +75,6 @@ proc `$`*(pack: Packet): string not nil =
     result = $pack.pos
   of ptYou:
     result = $pack.you
-
-proc kind*(p: Packet): PacketType =
-  p.kind
 
 proc parsePosition(idx: ClientId, data: string not nil): Option[Packet] =
   var pack: PkPosition
