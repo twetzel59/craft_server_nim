@@ -3,7 +3,7 @@ import
   vec
 
 type
-  ClientId* = distinct Natural
+  ClientId* = distinct uint8
 
   Client* = object
     ip: string
@@ -11,6 +11,7 @@ type
     transform*: Pos3Rot2f
 
 proc `==`*(a, b: ClientId): bool {.borrow.}
+proc `<=`*(a, b: ClientId): bool {.borrow.}
 proc `$`*(idx: ClientId): string {.borrow.}
 
 proc ip*(cl: Client): string = 
@@ -36,7 +37,7 @@ proc closeSocketMarkDead*(cl: var Client) {.raises: [].} =
 proc alive*(cl: Client): bool =
   cl.socket.isSome
 
-template withSocketIfAlive*(cl: Client, body: untyped): untyped {.dirty.} =
+template withSocketIfAlive*(cl: Client, body: untyped): untyped =
   if cl.alive:
-    let socket = cl.socket.unsafeGet()
+    let socket {.inject.} = cl.socket.unsafeGet()
     body

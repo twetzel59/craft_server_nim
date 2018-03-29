@@ -10,6 +10,7 @@ type
   Server = ref object
     servSocket: ServSocket
     clients: Table[ClientId, Client]
+    unusedIds: set[ClientId]
 
 proc sendInitial(idx: ClientId, cl: Client) {.async.} =
   withSocketIfAlive(cl):
@@ -57,7 +58,18 @@ proc clientLoop(se: Server; idx: ClientId) {.async.} =
       if line.len == 0:
         # Disconnect
         cl.closeSocketMarkDead()
+        se.clients.del(idx)
+        se.unusedIds.incl(idx)
         return
+
+proc nextClientId(se: Server): ClientId =
+  result = ClientId(se.clients.len)
+  
+  for i in se.unusedIds:
+    if i <= result:
+      result = i
+      se.unusedIds.excl(i)
+      break
 
 proc listenIncoming(se: Server) {.async.} =
   while true:
@@ -66,7 +78,7 @@ proc listenIncoming(se: Server) {.async.} =
     if not clientAddr.isNil:
       echo "Connecting: ", clientAddr
 
-      let idx = ClientId(se.clients.len)
+      let idx = se.nextClientId()
       let client = initClient(clientAddr, clientSocket)
       asyncCheck sendInitial(idx, client)
       se.clients.add(idx, client)
