@@ -7,14 +7,16 @@ from vec import nil
 
 const
   DELIMITER = ','
-  ID_POSITION* = 'P'
-  ID_YOU* = 'U'
+  ID_POSITION = 'P'
+  ID_TALK = 'T'
 
 type
   PacketType* = enum
     ptPosition,
     ptYou,
-    ptDisconnect
+    ptDisconnect,
+    ptTime,
+    ptTalk
 
   PkPosition* = object
     id*: ClientId
@@ -24,8 +26,15 @@ type
     id*: ClientId
     x*, y*, z*, rx*, ry*: float
 
-  PkDisconnect = object
+  PkDisconnect* = object
     id*: ClientId
+
+  PkTime* = object
+    current*: float
+    dayLength*: int
+
+  PkTalk* = object
+    message: string
 
   Packet* = object
     case kind: PacketType
@@ -35,6 +44,10 @@ type
       you*: PkYou
     of ptDisconnect:
       disco*: PkDisconnect
+    of ptTime:
+      time*: PkTime
+    of ptTalk:
+      talk*: PkTalk
 
 iterator countSplit(original: string not nil):
     tuple[idx: Natural, str: string not nil] =
@@ -48,15 +61,6 @@ template kind*(p: Packet): PacketType =
 
 converter toPos3Rot2f*(p: PkPosition): vec.Pos3Rot2f =
   (pos: (x: p.x, y: p.y, z: p.z), rot: (x: p.rx, y: p.ry))
-
-proc initPacket*(p: PkPosition): Packet =
-  result = Packet(kind: ptPosition, pos: p)
-
-proc initPacket*(u: PkYou): Packet =
-  result = Packet(kind: ptYou, you: u)
-
-proc initPacket*(d: PkDisconnect): Packet =
-  result = Packet(kind: ptDisconnect, disco: d)
 
 proc initPkPosition*(id: ClientId; transform: Pos3Rot2f): PkPosition =
   PkPosition(
@@ -75,6 +79,12 @@ proc initPkYou*(id: ClientId; transform: Pos3Rot2f): PkYou =
 proc initPkDisconnect*(id: ClientId): PkDisconnect =
   PkDisconnect(id: id)
 
+proc initPkTime*(currentEpochTime: float; dayLength: int): PkTime =
+  PkTime(current: currentEpochTime, dayLength: dayLength)
+
+proc initPkTalk*(message: string): PkTalk =
+  PkTalk(message: message)
+
 proc `$`*(p: PkPosition): string not nil =
   result = notNilOrDie(&"P,{p.id},{p.x},{p.y},{p.z},{p.rx},{p.ry}\n")
 
@@ -84,6 +94,13 @@ proc `$`*(u: PkYou): string not nil =
 proc `$`*(d: PkDisconnect): string not nil =
   result = notNilOrDie(&"D,{d.id}\n")
 
+proc `$`*(t: PkTime): string not nil =
+  result = notNilOrDie(&"E,{t.current},{t.dayLength}\n")
+
+proc `$`*(t: PkTalk): string not nil =
+  discard notNilOrDie(t.message)
+  result = notNilOrDie(&"T,{t.message}\n")
+
 proc `$`*(pack: Packet): string not nil =
   case pack.kind:
   of ptPosition:
@@ -92,6 +109,10 @@ proc `$`*(pack: Packet): string not nil =
     result = $pack.you
   of ptDisconnect:
     result = $pack.disco
+  of ptTime:
+    result = $pack.time
+  of ptTalk:
+    result = $pack.talk
 
 proc parsePosition(idx: ClientId, data: string not nil): Option[Packet] =
   var pack: PkPosition
@@ -122,9 +143,27 @@ proc parsePosition(idx: ClientId, data: string not nil): Option[Packet] =
 
   some(Packet(kind: ptPosition, pos: pack))
 
+proc parseTalk(data: string not nil): Option[Packet] =
+  var pack: PkTalk
+
+  for idx, str in countSplit(data):
+    case idx:
+    of 0:
+      # packet id
+      continue
+    of 1:
+      pack.message = str
+    else:
+      # invalid packet, too long
+      return none(Packet)
+  
+  some(Packet(kind: ptTalk, talk: pack))
+
 proc parsePacket*(idx: ClientId, data: string not nil): Option[Packet] =
   case data[0]:
   of ID_POSITION:
     result = parsePosition(idx, data)
+  of ID_TALK:
+    result = parseTalk(data)
   else:
     result = none(Packet)

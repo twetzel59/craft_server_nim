@@ -1,8 +1,11 @@
 import
   asyncdispatch, asyncnet, options, tables,
-  client, packets, settings, utils
+  client, packets, settings
+from times import epochTime
+from utils import notNilOrDie
 
-from os import sleep
+const
+  DAY_LENGTH = 600
 
 type
   ServSocket = AsyncSocket not nil
@@ -21,6 +24,7 @@ proc sendDisconnect(se: Server; idx: ClientId) {.async.} =
 proc sendInitial(se: Server; idx: ClientId; cl: Client) {.async.} =
   withSocketIfAlive(cl):
     await socket.send($initPkYou(idx, cl.transform))
+    await socket.send($initPkTime(epochTime(), DAY_LENGTH))
 
     for id, client in se.clients:
       if id != idx:
@@ -38,6 +42,11 @@ proc handlePacket(se: Server; idx: ClientId; pack: Packet) {.async.} =
       else:
         withSocketIfAlive(client):
           await socket.send(msg)
+  of ptTalk:
+    let msg = $pack
+    for client in se.clients.values():
+      withSocketIfAlive(client):
+        await socket.send(msg)
   else:
     discard
 
