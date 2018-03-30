@@ -14,6 +14,7 @@ type
   PacketType* = enum
     ptPosition,
     ptYou,
+    ptDisconnect
 
   PkPosition* = object
     id*: ClientId
@@ -23,12 +24,17 @@ type
     id*: ClientId
     x*, y*, z*, rx*, ry*: float
 
+  PkDisconnect = object
+    id*: ClientId
+
   Packet* = object
     case kind: PacketType
     of ptPosition:
       pos*: PkPosition
     of ptYou:
       you*: PkYou
+    of ptDisconnect:
+      disco*: PkDisconnect
 
 iterator countSplit(original: string not nil):
     tuple[idx: Natural, str: string not nil] =
@@ -49,6 +55,9 @@ proc initPacket*(p: PkPosition): Packet =
 proc initPacket*(u: PkYou): Packet =
   result = Packet(kind: ptYou, you: u)
 
+proc initPacket*(d: PkDisconnect): Packet =
+  result = Packet(kind: ptDisconnect, disco: d)
+
 proc initPkPosition*(id: ClientId; transform: Pos3Rot2f): PkPosition =
   PkPosition(
     id: id,
@@ -63,11 +72,17 @@ proc initPkYou*(id: ClientId; transform: Pos3Rot2f): PkYou =
     rx: transform.rot.x, ry: transform.rot.y
   )
 
+proc initPkDisconnect*(id: ClientId): PkDisconnect =
+  PkDisconnect(id: id)
+
 proc `$`*(p: PkPosition): string not nil =
   result = notNilOrDie(&"P,{p.id},{p.x},{p.y},{p.z},{p.rx},{p.ry}\n")
 
 proc `$`*(u: PkYou): string not nil =
   result = notNilOrDie(&"U,{u.id},{u.x},{u.y},{u.z},{u.rx},{u.ry}\n")
+
+proc `$`*(d: PkDisconnect): string not nil =
+  result = notNilOrDie(&"D,{d.id}\n")
 
 proc `$`*(pack: Packet): string not nil =
   case pack.kind:
@@ -75,6 +90,8 @@ proc `$`*(pack: Packet): string not nil =
     result = $pack.pos
   of ptYou:
     result = $pack.you
+  of ptDisconnect:
+    result = $pack.disco
 
 proc parsePosition(idx: ClientId, data: string not nil): Option[Packet] =
   var pack: PkPosition

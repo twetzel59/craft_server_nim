@@ -12,6 +12,12 @@ type
     clients: Table[ClientId, Client]
     unusedIds: set[ClientId]
 
+proc sendDisconnect(se: Server; idx: ClientId) {.async.} =
+  for id, client in se.clients:
+    if id != idx:
+      withSocketIfAlive(client):
+        await socket.send($initPkDisconnect(idx))
+
 proc sendInitial(se: Server; idx: ClientId; cl: Client) {.async.} =
   withSocketIfAlive(cl):
     await socket.send($initPkYou(idx, cl.transform))
@@ -44,14 +50,12 @@ proc clientLoop(se: Server; idx: ClientId) {.async.} =
       #echo line
 
       let packet = parsePacket(idx, line)
-      try:
-        let packet = packet.get()
-        asyncCheck handlePacket(se, idx, packet)
-      except:
-        discard
+      if packet.isSome:
+        await handlePacket(se, idx, packet.get())
 
       if line.len == 0:
         # Disconnect
+        await se.sendDisconnect(idx)
         cl.closeSocketMarkDead()
         se.clients.del(idx)
         se.unusedIds.incl(idx)
