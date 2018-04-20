@@ -34,7 +34,7 @@ type
     dayLength*: int
 
   PkTalk* = object
-    message: string
+    message*: string
 
   Packet* = object
     case kind: PacketType

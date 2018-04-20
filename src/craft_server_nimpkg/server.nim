@@ -1,6 +1,7 @@
 import
   asyncdispatch, asyncnet, options, tables,
-  client, packets, settings
+  client, packets, settings, strutils
+from math import fmod
 from times import epochTime
 from utils import notNilOrDie
 
@@ -8,12 +9,16 @@ const
   DAY_LENGTH = 600
 
 type
+  Command = enum
+    cmdTime
+
   ServSocket = AsyncSocket not nil
 
   Server = ref object
     servSocket: ServSocket
     clients: Table[ClientId, Client]
     unusedIds: set[ClientId]
+    timeOffset: float
 
 proc sendDisconnect(se: Server; idx: ClientId) {.async.} =
   for id, client in se.clients:
@@ -21,14 +26,53 @@ proc sendDisconnect(se: Server; idx: ClientId) {.async.} =
       withSocketIfAlive(client):
         await socket.send($initPkDisconnect(idx))
 
+proc sendTime(se: Server; socket: AsyncSocket) {.async.} =
+  await socket.send($initPkTime(epochTime() + se.timeOffset, DAY_LENGTH))
+
 proc sendInitial(se: Server; idx: ClientId; cl: Client) {.async.} =
   withSocketIfAlive(cl):
     await socket.send($initPkYou(idx, cl.transform))
-    await socket.send($initPkTime(epochTime(), DAY_LENGTH))
+    await se.sendTime(socket)
 
     for id, client in se.clients:
       if id != idx:
         await socket.send($initPkPosition(id, client.transform))
+
+proc handleInvalidCommand(se: Server; command: Command; idx: ClientId) {.async.} =
+  const messages: array[Command, string not nil] = [
+    notNilOrDie "Usage: /time <daytime: float>"
+  ]
+
+  withSocketIfAlive(se.clients[idx]):
+    await socket.send($initPkTalk(messages[command]))
+
+proc handleChatCommand(se: Server; idx: ClientId; msg: string not nil) {.async.} =
+  echo "command: ", msg
+  let parts = msg.splitWhitespace()
+
+  case parts[0]:
+  of "/time":
+    if parts.len == 2:
+      var newTime = none(float)
+
+      try:
+        newTime = some(parts[1].parseFloat())
+      except ValueError:
+        discard
+
+      if newTime.isSome():
+        withSocketIfAlive(se.clients[idx]):
+          await socket.send($initPkTalk("Set time to " & $newTime.get()))
+          se.timeOffset = fmod(newTime.get(), DAY_LENGTH) - epochTime()
+          for client in se.clients.values():
+            withSocketIfAlive(client):
+              await se.sendTime(socket)
+      else:
+          await se.handleInvalidCommand(cmdTime, idx)
+    else:
+      await se.handleInvalidCommand(cmdTime, idx)
+  else:
+    discard
 
 proc handlePacket(se: Server; idx: ClientId; pack: Packet) {.async.} =
   case pack.kind:
@@ -43,10 +87,14 @@ proc handlePacket(se: Server; idx: ClientId; pack: Packet) {.async.} =
         withSocketIfAlive(client):
           await socket.send(msg)
   of ptTalk:
-    let msg = $pack
-    for client in se.clients.values():
-      withSocketIfAlive(client):
-        await socket.send(msg)
+    if not pack.talk.message.isNil:
+      if pack.talk.message.startsWith('/'):
+        await handleChatCommand(se, idx, pack.talk.message)
+      else:
+        let msg = $pack
+        for client in se.clients.values():
+          withSocketIfAlive(client):
+            await socket.send(msg)
   else:
     discard
 
