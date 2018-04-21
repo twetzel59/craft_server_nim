@@ -150,7 +150,7 @@ proc newServer(settings: Settings): Server =
   result = Server(
     servSocket: createSocket(settings.port),
     clients: initTable[ClientId, Client](),
-    nicks: initNickManager()
+    nicks: newNickManager(),
   )
 
 proc cleanup(se: Server) =
