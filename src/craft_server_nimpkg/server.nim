@@ -1,6 +1,6 @@
 import
   asyncdispatch, asyncnet, options, tables,
-  client, packets, settings, strutils
+  client, nicknames, packets, settings, strutils
 from math import fmod
 from times import epochTime
 from utils import notNilOrDie
@@ -17,6 +17,7 @@ type
   Server = ref object
     servSocket: ServSocket
     clients: Table[ClientId, Client]
+    nicks: NickManager
     unusedIds: set[ClientId]
     timeOffset: float
 
@@ -149,6 +150,7 @@ proc newServer(settings: Settings): Server =
   result = Server(
     servSocket: createSocket(settings.port),
     clients: initTable[ClientId, Client](),
+    nicks: initNickManager()
   )
 
 proc cleanup(se: Server) =
