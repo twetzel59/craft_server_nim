@@ -16,7 +16,8 @@ type
     ptYou,
     ptDisconnect,
     ptTime,
-    ptTalk
+    ptTalk,
+    ptNick
 
   PkPosition* = object
     id*: ClientId
@@ -35,6 +36,10 @@ type
 
   PkTalk* = object
     message*: string
+  
+  PkNick* = object
+    id*: ClientId
+    nick*: string
 
   Packet* = object
     case kind: PacketType
@@ -48,6 +53,8 @@ type
       time*: PkTime
     of ptTalk:
       talk*: PkTalk
+    of ptNick:
+      nick*: PkNick
 
 iterator countSplit(original: string not nil):
     tuple[idx: Natural, str: string not nil] =
@@ -85,6 +92,9 @@ proc initPkTime*(currentEpochTime: float; dayLength: int): PkTime =
 proc initPkTalk*(message: string): PkTalk =
   PkTalk(message: message)
 
+proc initPkNick*(id: ClientId; nickname: string): PkNick =
+  PkNick(id: id, nick: nickname)
+
 proc `$`*(p: PkPosition): string not nil =
   result = notNilOrDie(&"P,{p.id},{p.x},{p.y},{p.z},{p.rx},{p.ry}\n")
 
@@ -101,6 +111,10 @@ proc `$`*(t: PkTalk): string not nil =
   discard notNilOrDie(t.message)
   result = notNilOrDie(&"T,{t.message}\n")
 
+proc `$`*(n: PkNick): string not nil =
+  discard notNilOrDie(n.nick)
+  result = notNilOrDie(&"N,{n.id},{n.nick}\n")
+
 proc `$`*(pack: Packet): string not nil =
   case pack.kind:
   of ptPosition:
@@ -113,6 +127,8 @@ proc `$`*(pack: Packet): string not nil =
     result = $pack.time
   of ptTalk:
     result = $pack.talk
+  of ptNick:
+    result = $pack.nick
 
 proc parsePosition(idx: ClientId, data: string not nil): Option[Packet] =
   var pack: PkPosition

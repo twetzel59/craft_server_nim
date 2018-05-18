@@ -10,7 +10,8 @@ const
 
 type
   Command = enum
-    cmdTime
+    cmdTime,
+    cmdNick
 
   ServSocket = AsyncSocket not nil
 
@@ -30,18 +31,33 @@ proc sendDisconnect(se: Server; idx: ClientId) {.async.} =
 proc sendTime(se: Server; socket: AsyncSocket) {.async.} =
   await socket.send($initPkTime(epochTime() + se.timeOffset, DAY_LENGTH))
 
+proc sendNicks(se: Server; socket: AsyncSocket) {.async.} =
+  for idx, client in se.clients:
+    let nick: nil string = se.nicks.getOrNil(client.ip)
+    if not nick.isNil:
+      await socket.send($initPkNick(idx, nick))
+
+proc sendNickUpdate(se: Server; idx: ClientId) {.async.} =
+  let nick: nil string = se.nicks.getOrNil(se.clients[idx].ip)
+  if not nick.isNil:
+    for client in se.clients.values():
+      withSocketIfAlive(client):
+        await socket.send($initPkNick(idx, nick))
+
 proc sendInitial(se: Server; idx: ClientId; cl: Client) {.async.} =
   withSocketIfAlive(cl):
     await socket.send($initPkYou(idx, cl.transform))
     await se.sendTime(socket)
 
-    for id, client in se.clients:
-      if id != idx:
-        await socket.send($initPkPosition(id, client.transform))
+    for id, otherClient in se.clients:
+      await socket.send($initPkPosition(id, otherClient.transform))
+
+    await se.sendNicks(socket)
 
 proc handleInvalidCommand(se: Server; command: Command; idx: ClientId) {.async.} =
   const messages: array[Command, string not nil] = [
-    notNilOrDie "Usage: /time <daytime: float>"
+    notNilOrDie "Usage: /time <daytime: float>",
+    notNilOrDie "Usage: /nick <nickname: string>",
   ]
 
   withSocketIfAlive(se.clients[idx]):
@@ -69,9 +85,21 @@ proc handleChatCommand(se: Server; idx: ClientId; msg: string not nil) {.async.}
             withSocketIfAlive(client):
               await se.sendTime(socket)
       else:
-          await se.handleInvalidCommand(cmdTime, idx)
+        await se.handleInvalidCommand(cmdTime, idx)
     else:
       await se.handleInvalidCommand(cmdTime, idx)
+  of "/nick":
+    if parts.len == 2:
+      if parts[1].isAlphaNumeric():
+        withSocketIfAlive(se.clients[idx]):
+          await socket.send($(initPkTalk("Set nickname to " & parts[1])))
+          #for client in se.clients.values():
+          #  withSocketIfAlive(client):
+          #    await se.sendNick(socket)
+      else:
+        await se.handleInvalidCommand(cmdNick, idx)
+    else:
+      await se.handleInvalidCommand(cmdNick, idx)
   else:
     discard
 
@@ -101,6 +129,8 @@ proc handlePacket(se: Server; idx: ClientId; pack: Packet) {.async.} =
 
 proc clientLoop(se: Server; idx: ClientId) {.async.} =
   template cl(): untyped = se.clients[idx]
+
+  await se.sendNickUpdate(idx)
 
   while true:
     withSocketIfAlive(cl):
@@ -137,7 +167,7 @@ proc listenIncoming(se: Server) {.async.} =
 
       let idx = se.nextClientId()
       let client = initClient(clientAddr, clientSocket)
-      asyncCheck sendInitial(se, idx, client)
+      await sendInitial(se, idx, client)
       se.clients.add(idx, client)
       asyncCheck se.clientLoop(idx)
 

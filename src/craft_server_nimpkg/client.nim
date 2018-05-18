@@ -1,12 +1,14 @@
 import
   asyncnet, options,
   vec
+from net import
+  IpAddress, parseIpAddress
 
 type
   ClientId* = distinct uint8
 
   Client* = object
-    ip: string
+    ip: IpAddress
     socket: Option[AsyncSocket]
     transform*: Pos3Rot2f
 
@@ -14,15 +16,15 @@ proc `==`*(a, b: ClientId): bool {.borrow.}
 proc `<=`*(a, b: ClientId): bool {.borrow.}
 proc `$`*(idx: ClientId): string {.borrow.}
 
-proc ip*(cl: Client): string = 
+proc ip*(cl: Client): IpAddress = 
   cl.ip
 
 proc socket*(cl: Client): Option[AsyncSocket] =
   cl.socket
 
-proc initClient*(ip: string not nil, socket: AsyncSocket): Client =
+proc initClient*(ipStr: string not nil, socket: AsyncSocket): Client {.raises: [ValueError].} =
   result = Client(
-    ip: ip,
+    ip: parseIpAddress(ipStr),
     socket: some(socket),
   )
 

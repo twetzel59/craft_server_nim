@@ -1,5 +1,5 @@
 import
-  net, parseutils, sets, streams, tables
+  net, options, parseutils, sets, streams, tables
 from hashes import
   Hash, hash
 from os import existsFile
@@ -16,7 +16,7 @@ type
   NickManagerObj = object
     map: Table[IpAddress, string]
     file: FileStream not nil
-  
+
   NickManager* = ref NickManagerObj not nil
 
 proc createFileIfNeeded();
@@ -33,11 +33,15 @@ proc newNickManager*(): NickManager =
 
   result.parseFile()
 
+proc getOrNil*(nm: NickManager; ip: IpAddress): nil string =
+  nm.map.withValue(ip, nick):
+    return nick[]
+
 proc createFileIfNeeded() =
   let f = open(NICK_FILE, fmAppend)
   f.close()
 
-proc parseFile(nm: var NickManager) =
+proc parseFile(nm: var NickManager) {.raises: [ValueError].} =
   template fail(msg = ERROR_MSG): untyped =
     raise newException(ValueError, msg)
 
