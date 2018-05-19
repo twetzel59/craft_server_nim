@@ -1,4 +1,4 @@
-import std / net
+import std / [net, tables]
 import client, settings
 from utils as ut import nil
 
@@ -6,11 +6,16 @@ type
   ServerSocket = Socket not nil
 
   Server = object
-    clients: ut.Seq[Client]
     socket: ServerSocket
+    clients: Table[ClientId, Client]
+    unusedIds: set[ClientId]
 
 proc initServer(): Server =
-  Server(clients: @[], socket: newSocket())
+  Server(
+    socket: newSocket(),
+    clients: initTable[ClientId, Client](),
+    unusedIds: {0.ClientId .. high(ClientId).ClientId}
+  )
 
 proc bindListen(s: Server; settings: Settings) =
   s.socket.bindAddr(settings.port)
@@ -22,6 +27,7 @@ proc serverBegin*(settings: Settings) =
 
   var s = initServer()
   s.bindListen(settings)
+  echo "unused: ", s.unusedIds
 
   while true:
     var clientSocket = new Socket

@@ -23,7 +23,7 @@ proc handleArgs(): Settings =
     of cmdShortOption:
       case key
       of "w":
-        result.worldFile = notNilOrDie(val)
+        result.worldFile = notNil(val)
       of "p":
         result.port = val.parseInt().Port
       else:
@@ -31,7 +31,7 @@ proc handleArgs(): Settings =
     of cmdLongOption:
       case key
       of "worldFile":
-        result.worldFile = notNilOrDie(val)
+        result.worldFile = notNil(val)
       of "port":
         result.port = val.parseInt().Port
       else:
