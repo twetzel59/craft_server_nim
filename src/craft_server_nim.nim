@@ -1,55 +1,51 @@
-import asyncdispatch, asyncnet
+import
+  std / [ asyncdispatch, asyncnet, tables ],
+  client
 
 const
   craftPort = Port(4080)
 
 type
-  Client = ref object
-    ipStr: string
-    socket: AsyncSocket
-    id: int
-    connected: bool
-
   Server = ref object
     socket: AsyncSocket
-    clients: seq[Client]
-
-func newClient(accepted: tuple[address: string, client: AsyncSocket]; id: int): Client =
-  Client(
-    ipStr: accepted[0],
-    socket: accepted[1],
-    id: id,
-    connected: true
-  )
+    clients: Table[ClientId, Client]
+    idGen: IdGenerator
 
 func newServer(servSocket: AsyncSocket): Server =
-  Server(socket: servSocket)
+  Server(
+    socket: servSocket,
+    clients: initTable[ClientId, Client]()
+  )
 
-proc clientLoop(client: Client) {.async.} =
+proc clientLoop(cl: Client) {.async.} =
+  sendInitial cl
+
   while true:
-    let line = await recvLine client.socket
+    let line = await recvLine cl.socket
 
     if len(line) == 0:
       # Client disconnected.
-      echo "Disconnecting: ", client.ipStr
+      echo "Disconnecting: ", cl.ipStr
       return
 
-proc servLoop(serv: Server) {.async.} =
-  bindAddr serv.socket, craftPort
-  listen serv.socket
+proc serverLoop(se: Server) {.async.} =
+  bindAddr se.socket, craftPort
+  listen se.socket
 
   while true:
-    let accepted = await acceptAddr serv.socket
+    let
+      accepted = await acceptAddr se.socket
+      client = newClient accepted
+    
     echo "Connecting: ", accepted[0]
 
-    let client = newClient(accepted, len serv.clients)
-    #add serv.clients, client
+    se.clients[nextId se.idGen] = client
 
     asyncCheck clientLoop(client)
 
 proc main() =
-  let serv = newServer newAsyncSocket()
-  waitFor servLoop serv
+  let se = newServer newAsyncSocket()
+  waitFor serverLoop se
 
 when isMainModule:
   main()
