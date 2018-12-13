@@ -1,5 +1,5 @@
 import
-  std / [ asyncdispatch, asyncnet, tables ],
+  std / [ asyncdispatch, asyncnet, options, tables ],
   client
 
 const
@@ -14,7 +14,8 @@ type
 func newServer(servSocket: AsyncSocket): Server =
   Server(
     socket: servSocket,
-    clients: initTable[ClientId, Client]()
+    clients: initTable[ClientId, Client](),
+    idGen: initIdGenerator(),
   )
 
 proc clientLoop(cl: Client) {.async.} =
@@ -27,6 +28,8 @@ proc clientLoop(cl: Client) {.async.} =
       # Client disconnected.
       echo "Disconnecting: ", cl.ipStr
       return
+    #else:
+    #  echo "Incoming [", cl.ipStr, "]: ", line 
 
 proc serverLoop(se: Server) {.async.} =
   bindAddr se.socket, craftPort
@@ -34,12 +37,13 @@ proc serverLoop(se: Server) {.async.} =
 
   while true:
     let
+      id = get nextId se.idGen # TODO: Handle exception. Full server??
       accepted = await acceptAddr se.socket
       client = newClient accepted
     
     echo "Connecting: ", accepted[0]
 
-    se.clients[nextId se.idGen] = client
+    se.clients[id] = client
 
     asyncCheck clientLoop(client)
 
