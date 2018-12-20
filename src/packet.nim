@@ -30,13 +30,16 @@ func initYou*(id: ClientId; pr: PosRot): Packet =
 func `$`*(pack: Packet): string =
   case pack.kind:
   of Talk:
+    # T,<message: string>\n
     'T' & sep &
       pack.msg & tail
   of Time:
+    # E,<current time: fractional>,<day length: unsigned>\n
     'E' & sep &
       $pack.time & sep &
       $pack.dayLength & tail
   of You:
+    # U,<client id: unsigned>,<player x: fractional>,<y>,<z>,<rx>,<ry>
     'U' & sep &
       $pack.id & sep &
       $pack.transform & tail
