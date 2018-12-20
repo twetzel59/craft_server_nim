@@ -18,7 +18,7 @@ func newServer(servSocket: AsyncSocket): Server =
     idGen: initIdGenerator(),
   )
 
-proc sendInitial*(id: ClientId; cl: Client) {.async.} =
+proc sendInitial*(se: Server; id: ClientId; cl: Client) {.async.} =
   # Tell the Client what its ID is, and what time it is
   # on the server.
   await send(cl.socket, $initYou(id, cl.player.transform))
@@ -28,17 +28,27 @@ proc sendInitial*(id: ClientId; cl: Client) {.async.} =
   # send it to the Client.
   if welcome.isSome:
     await send(cl.socket, $initTalk(welcome.get))
+  
+  # Send the client the positions of the other clients.
+  # Other players are handled "lazily" by the Craft client.
+  # The are created only when they are first referenced by a
+  # Position packet.
+  for otherId, otherClient in se.clients:
+    # Skip sending to ourself.
+    if otherId != id:
+      await send(cl.socket,
+        $initPosition(otherId, otherClient.player.transform))
 
-proc clientLoop(id: ClientId; cl: Client) {.async.} =
+proc clientLoop(se: Server; id: ClientId; cl: Client) {.async.} =
   # Perform the standard Craft handshake.
-  await sendInitial(id, cl)
+  await sendInitial(se, id, cl)
 
   while true:
     # Wait for network packet to arrive.
     let line = await recvLine cl.socket
 
     if len(line) == 0:
-      # If the line length is zero, th Client has
+      # If the line length is zero, the Client has
       # disconnected from the server.
       echo "Disconnecting: ", cl.ipStr
       return
@@ -67,11 +77,16 @@ proc serverLoop(se: Server) {.async.} =
     se.clients[id] = client
 
     # Start the Client's asyncronous event loop.
-    asyncCheck clientLoop(id, client)
+    asyncCheck clientLoop(se, id, client)
 
 proc main() =
+  # Create the server's socket, and allow reuse of the address to
+  # prevent annoying "Address already in use" errors.
+  let socket = newAsyncSocket()
+  setSockOpt socket, OptReuseAddr, true
+
   # Create a new Server and start the main listening loop.
-  let se = newServer newAsyncSocket()
+  let se = newServer socket
   waitFor serverLoop se
 
 when isMainModule:
