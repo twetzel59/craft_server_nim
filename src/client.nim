@@ -1,4 +1,6 @@
-import std / [ asyncnet, options ], entity, packet
+import
+  std / [ asyncnet, options ],
+  entity
 
 type
   Client* = ref object
@@ -26,9 +28,6 @@ func ipStr*(cl: Client): string =
 func socket*(cl: Client): AsyncSocket =
   cl.socket
 
-proc sendInitial*(cl: Client) =
-  echo "Should Send Handshake"
-
 proc `$`*(a: ClientId): string {.borrow.}
 proc `==`*(a, b: ClientId): bool {.borrow.}
 
@@ -49,7 +48,7 @@ func nextId*(gen: var IdGenerator): Option[ClientId] =
   
   none(ClientId)
 
-func releaseId*(gen: var IdGenerator, id: ClientId) =
+func releaseId*(gen: var IdGenerator; id: ClientId) =
   incl gen.available, id
 
 #iterator items*(gen: IdGenerator): ClientId =
