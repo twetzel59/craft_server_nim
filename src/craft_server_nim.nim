@@ -1,6 +1,6 @@
 import
-  std / [ asyncdispatch, asyncnet, options, tables ],
-  client, packet
+  std / [ asyncdispatch, asyncnet, options, tables, times ],
+  client, common, packet
 
 const
   craftPort = Port(4080)
@@ -19,9 +19,8 @@ func newServer(servSocket: AsyncSocket): Server =
   )
 
 proc sendInitial*(id: ClientId; cl: Client) {.async.} =
-  let youPacket = initYou(id, cl.player.transform)
-
-  await send(cl.socket, $youPacket)
+  await send(cl.socket, $initYou(id, cl.player.transform))
+  await send(cl.socket, $initTime(epochTime(), dayLength))
 
 proc clientLoop(id: ClientId; cl: Client) {.async.} =
   await sendInitial(id, cl)
