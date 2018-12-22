@@ -2,6 +2,9 @@ import
   std / [ options ]
 
 const
+  # Server
+  logFile* = "log.txt"
+
   # Game
   dayLength* = 600
   welcome* = some("Welcome to our very *Nimble* Craft server!")

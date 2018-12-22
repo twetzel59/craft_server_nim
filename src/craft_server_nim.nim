@@ -1,18 +1,20 @@
 import
   std / [ asyncdispatch, asyncnet, options, tables, times ],
-  client, common, packet
+  client, common, logging, packet
 
 const
   craftPort = Port(4080)
 
 type
   Server = ref object
+    log: Logger
     socket: AsyncSocket
     clients: Table[ClientId, Client]
     idGen: IdGenerator
 
-func newServer(servSocket: AsyncSocket): Server =
+func newServer(log: Logger; servSocket: AsyncSocket): Server =
   Server(
+    log: log,
     socket: servSocket,
     clients: initTable[ClientId, Client](),
     idGen: initIdGenerator(),
@@ -50,7 +52,7 @@ proc clientLoop(se: Server; id: ClientId; cl: Client) {.async.} =
     if len(line) == 0:
       # If the line length is zero, the Client has
       # disconnected from the server.
-      echo "Disconnecting: ", cl.ipStr
+      await log(se.log, "Disconnecting: ", cl.ipStr)
 
       close cl
       return
@@ -62,9 +64,9 @@ proc clientLoop(se: Server; id: ClientId; cl: Client) {.async.} =
         case pack.kind:
         of Version:
           if pack.version != protocolVer:
-            echo "Client ", cl.ipStr,
+            await log(se.log, "Client ", cl.ipStr,
               " is running unsupported version [", pack.version,
-              "] and will be kicked."
+              "] and will be kicked.")
             
             close cl
             return
@@ -89,7 +91,7 @@ proc serverLoop(se: Server) {.async.} =
       accepted = await acceptAddr se.socket
       client = newClient accepted
     
-    echo "Connecting: ", accepted[0]
+    await log(se.log, "Connecting: ", accepted[0])
 
     # Add the new client to the server's hash table of IDs => Clients.
     se.clients[id] = client
@@ -98,13 +100,19 @@ proc serverLoop(se: Server) {.async.} =
     asyncCheck clientLoop(se, id, client)
 
 proc main() =
+  # Initialize the logger. The log file will be created if
+  # it doesn't exist. Set the logger to close when the
+  # server exits.
+  let log = newLogger(logFile)
+  defer: close log
+
   # Create the server's socket, and allow reuse of the address to
   # prevent annoying "Address already in use" errors.
   let socket = newAsyncSocket()
   setSockOpt socket, OptReuseAddr, true
 
   # Create a new Server and start the main listening loop.
-  let se = newServer socket
+  let se = newServer(log, socket)
   waitFor serverLoop se
 
 when isMainModule:
