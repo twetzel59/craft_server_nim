@@ -6,7 +6,7 @@ type
   Client* = ref object
     ipStr: string
     socket: AsyncSocket
-    connected*: bool
+    connected: bool
     player*: Player
   
   ClientId* = distinct uint16
@@ -27,6 +27,10 @@ func ipStr*(cl: Client): string =
 
 func socket*(cl: Client): AsyncSocket =
   cl.socket
+
+proc close*(cl: Client) =
+  close cl.socket
+  cl.connected = false
 
 proc `$`*(a: ClientId): string {.borrow.}
 proc `==`*(a, b: ClientId): bool {.borrow.}

@@ -34,7 +34,7 @@ proc sendInitial*(se: Server; id: ClientId; cl: Client) {.async.} =
   # The are created only when they are first referenced by a
   # Position packet.
   for otherId, otherClient in se.clients:
-    # Skip sending to ourself.
+    # Skip sending our own position to ourself.
     if otherId != id:
       await send(cl.socket,
         $initPosition(otherId, otherClient.player.transform))
@@ -51,6 +51,8 @@ proc clientLoop(se: Server; id: ClientId; cl: Client) {.async.} =
       # If the line length is zero, the Client has
       # disconnected from the server.
       echo "Disconnecting: ", cl.ipStr
+
+      close cl
       return
     else:
       #echo "Incoming [", cl.ipStr, "]: ", line
@@ -59,7 +61,13 @@ proc clientLoop(se: Server; id: ClientId; cl: Client) {.async.} =
         
         case pack.kind:
         of Version:
-          echo "Client is running version: ", pack.version
+          if pack.version != protocolVer:
+            echo "Client ", cl.ipStr,
+              " is running unsupported version [", pack.version,
+              "] and will be kicked."
+            
+            close cl
+            return
         else:
           discard
       except UnpackError:

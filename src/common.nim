@@ -7,5 +7,6 @@ const
   welcome* = some("Welcome to our very *Nimble* Craft server!")
 
   # Network
+  protocolVer* = 1
   sep* = ','
   tail* = '\n'
