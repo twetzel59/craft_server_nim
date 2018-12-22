@@ -52,8 +52,18 @@ proc clientLoop(se: Server; id: ClientId; cl: Client) {.async.} =
       # disconnected from the server.
       echo "Disconnecting: ", cl.ipStr
       return
-    #else:
-    #  echo "Incoming [", cl.ipStr, "]: ", line 
+    else:
+      #echo "Incoming [", cl.ipStr, "]: ", line
+      try:
+        let pack = parsePacket(line).get
+        
+        case pack.kind:
+        of Version:
+          echo "Client is running version: ", pack.version
+        else:
+          discard
+      except UnpackError:
+        discard
 
 proc serverLoop(se: Server) {.async.} =
   # Bind the TCP server socket to a default localhost
