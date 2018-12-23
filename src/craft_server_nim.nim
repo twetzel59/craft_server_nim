@@ -20,6 +20,16 @@ func newServer(log: Logger; servSocket: AsyncSocket): Server =
     idGen: initIdGenerator(),
   )
 
+proc sendToAll*(se: Server; pack: Packet) {.async.} =
+  # Send the Packet to all the Clients on the server.
+
+  # Stringify it first.
+  let data = $pack
+
+  # Send to each Client.
+  for cl in values se.clients:
+    await send(cl.socket, data)
+
 proc sendInitial*(se: Server; id: ClientId; cl: Client) {.async.} =
   # Tell the Client what its ID is, and what time it is
   # on the server.
@@ -62,6 +72,8 @@ proc clientLoop(se: Server; id: ClientId; cl: Client) {.async.} =
         let pack = parsePacket(line).get
         
         case pack.kind:
+        of Talk:
+          await sendToAll(se, initTalk(pack.msg))
         of Version:
           if pack.version != protocolVer:
             await log(se.log, "Client ", cl.ipStr,
@@ -76,6 +88,10 @@ proc clientLoop(se: Server; id: ClientId; cl: Client) {.async.} =
         discard
 
 proc serverLoop(se: Server) {.async.} =
+  # Log the server start with time and date.
+  await log(se.log, '\n', getTime().format("yyyy-MM-dd hh:mm:ss"),
+    " Starting server")
+
   # Bind the TCP server socket to a default localhost
   # address at Craft's port. Then, mark the socket
   # as accepting new connections.

@@ -79,13 +79,16 @@ func `$`*(pack: Packet): string =
       $pack.youId & sep &
       $pack.youTransform & tail
 
-func parsePacket*(packet: string): Option[Packet] =
-  if packet.len < 3:
+func parsePacket*(packStr: string): Option[Packet] =
+  if packStr.len < 3:
     return none(Packet)
   
-  let pieces = split(packet, sep)
+  let pieces = split(packStr, sep)
 
-  case packet[0]:
+  case packStr[0]:
+  of headerTalk:
+    if pieces.len == 2:
+      return some(initTalk(pieces[1]))
   of headerVersion:
     if pieces.len == 2:
       try:
