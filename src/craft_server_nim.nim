@@ -1,6 +1,6 @@
 import
   std / [ asyncdispatch, asyncnet, options, tables, times ],
-  client, common, logging, packet, entity, math
+  client, common, logging, packet
 
 const
   craftPort = Port(4080)
@@ -60,6 +60,27 @@ proc sendInitial(se: Server; id: ClientId; cl: Client) {.async.} =
       await send(cl.socket,
         $initPosition(otherId, otherClient.player.transform))
 
+proc handleDisconnect(se: Server; id: ClientId; cl: Client) {.async.} =
+  await log(se.log, "Disconnecting: ", cl.ipStr)
+
+  let pack = initDisconnect(id)
+  await sendToAllExcept(se, id, pack)
+
+proc handleBadVersion(se: Server; id: ClientId; cl: Client; ver: int) {.async.} =
+  await log(se.log, "Client ", cl.ipStr,
+    " is running unsupported version [", ver,
+    "] and will be kicked.")
+
+proc removeClient(se: Server; id: ClientId, cl: Client) =
+  # Close the Client's socket.
+  close cl
+
+  # Remove the Client from the server.
+  del se.clients, id
+
+  # Free the Client's ID.
+  releaseId se.idGen, id
+
 proc clientLoop(se: Server; id: ClientId; cl: Client) {.async.} =
   # Perform the standard Craft handshake.
   await sendInitial(se, id, cl)
@@ -71,9 +92,8 @@ proc clientLoop(se: Server; id: ClientId; cl: Client) {.async.} =
     if len(line) == 0:
       # If the line length is zero, the Client has
       # disconnected from the server.
-      await log(se.log, "Disconnecting: ", cl.ipStr)
-
-      close cl
+      removeClient se, id, cl
+      await handleDisconnect(se, id, cl)
       return
     else:
       #echo "Incoming [", cl.ipStr, "]: ", line
@@ -88,11 +108,8 @@ proc clientLoop(se: Server; id: ClientId; cl: Client) {.async.} =
           await sendToAll(se, initTalk(pack.msg))
         of Version:
           if pack.version != protocolVer:
-            await log(se.log, "Client ", cl.ipStr,
-              " is running unsupported version [", pack.version,
-              "] and will be kicked.")
-            
-            close cl
+            removeClient se, id, cl
+            await handleBadVersion(se, id, cl, pack.version)
             return
         else:
           discard

@@ -3,6 +3,7 @@ import
   client, common, entity
 
 const
+  headerDisconnect = 'D'
   headerPosition = 'P'
   headerTalk = 'T'
   headerTime = 'E'
@@ -11,6 +12,7 @@ const
 
 type
   PacketKind* = enum
+    Disconnect,
     Position,
     Talk,
     Time,
@@ -19,6 +21,9 @@ type
 
   Packet* = object
     case kind*: PacketKind:
+    of Disconnect:
+      # Outbound only
+      discoId: ClientId
     of Position:
       # In/Out
       posId*: ClientId
@@ -39,6 +44,9 @@ type
       youTransform: PosRot
 
 # Public constructors
+func initDisconnect*(id: ClientId): Packet =
+  Packet(kind: Disconnect, discoId: id)
+
 func initPosition*(id: ClientId; pr: PosRot): Packet =
   Packet(kind: Position, posId: id, posTransform: pr)
 
@@ -57,6 +65,9 @@ func initVersion(version: int): Packet =
 
 func `$`*(pack: Packet): string =
   case pack.kind:
+  of Disconnect:
+    #D,<client id: unsigned>
+    headerDisconnect & sep & $pack.discoId & tail
   of Position:
     # P,<client id: unsigned>,<player x: fractional>,<y>,<z>,<rx>,<ry>\n
     headerPosition & sep &
