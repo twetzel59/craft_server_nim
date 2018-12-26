@@ -1,5 +1,5 @@
 import
-  std / [ math ],
+  std / [ math, strutils ],
   common
 
 type
@@ -30,8 +30,13 @@ func check*(pr: PosRot): bool =
     ck(pr.rx) and ck(pr.ry)
 
 func `$`*(pr: PosRot): string =
-  $pr.x & sep &
-    $pr.y & sep &
-    $pr.z & sep &
-    $pr.rx & sep &
-    $pr.ry
+  const p = 2 # number of decimal places
+
+  template str(f: float32): string =
+    formatFloat(f, ffDecimal, p)
+
+  str(pr.x) & sep &
+    str(pr.y) & sep &
+    str(pr.z) & sep &
+    str(pr.rx) & sep &
+    str(pr.ry)
