@@ -1,6 +1,6 @@
 import
   std / [ asyncdispatch, asyncnet, options, tables, times ],
-  client, common, logging, packet
+  client, common, logging, packet, entity, math
 
 const
   craftPort = Port(4080)
@@ -20,17 +20,26 @@ func newServer(log: Logger; servSocket: AsyncSocket): Server =
     idGen: initIdGenerator(),
   )
 
-proc sendToAll*(se: Server; pack: Packet) {.async.} =
+proc sendToAllImpl(se: Server; ignore: Option[ClientId]; pack: Packet) {.async.} =
   # Send the Packet to all the Clients on the server.
 
   # Stringify it first.
   let data = $pack
 
   # Send to each Client.
-  for cl in values se.clients:
+  for id, cl in se.clients:
+    if isSome(ignore) and get(ignore) == id:
+      continue
+    
     await send(cl.socket, data)
 
-proc sendInitial*(se: Server; id: ClientId; cl: Client) {.async.} =
+template sendToAllExcept(se: Server; ignore: ClientId; pack: Packet): auto =
+  sendToAllImpl se, some(ignore), pack
+
+template sendToAll(se: Server; pack: Packet): auto =
+  sendToAllImpl se, none(ClientId), pack
+
+proc sendInitial(se: Server; id: ClientId; cl: Client) {.async.} =
   # Tell the Client what its ID is, and what time it is
   # on the server.
   await send(cl.socket, $initYou(id, cl.player.transform))
@@ -69,9 +78,11 @@ proc clientLoop(se: Server; id: ClientId; cl: Client) {.async.} =
     else:
       #echo "Incoming [", cl.ipStr, "]: ", line
       try:
-        let pack = parsePacket(line).get
+        let pack = parsePacket(id, line).get
         
         case pack.kind:
+        of Position:
+          await sendToAllExcept(se, id, initPosition(pack.posId, pack.posTransform))
         of Talk:
           await sendToAll(se, initTalk(pack.msg))
         of Version:

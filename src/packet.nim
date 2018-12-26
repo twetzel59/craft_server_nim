@@ -79,13 +79,30 @@ func `$`*(pack: Packet): string =
       $pack.youId & sep &
       $pack.youTransform & tail
 
-func parsePacket*(packStr: string): Option[Packet] =
+func parsePacket*(senderId: ClientId; packStr: string): Option[Packet] =
   if packStr.len < 3:
     return none(Packet)
   
   let pieces = split(packStr, sep)
 
   case packStr[0]:
+  of headerPosition:
+    if pieces.len == 6:
+      try:
+        let pr = (
+          x:  parseFloat(pieces[1]).float32,
+          y:  parseFloat(pieces[2]).float32,
+          z:  parseFloat(pieces[3]).float32,
+          rx: parseFloat(pieces[4]).float32,
+          ry: parseFloat(pieces[5]).float32,
+        )
+
+        if check pr:
+          return some(initPosition(senderId, pr))
+        else:
+          return none(Packet)
+      except ValueError:
+        discard
   of headerTalk:
     if pieces.len == 2:
       return some(initTalk(pieces[1]))
