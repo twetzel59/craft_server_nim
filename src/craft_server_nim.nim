@@ -17,7 +17,7 @@ func newServer(log: Logger; servSocket: AsyncSocket): Server =
     log: log,
     socket: servSocket,
     clients: initTable[ClientId, Client](),
-    idGen: initIdGenerator(),
+    idGen: initIdGenerator()
   )
 
 proc sendToAllImpl(se: Server; ignore: Option[ClientId]; pack: Packet) {.async.} =
@@ -82,6 +82,7 @@ proc clientLoop(se: Server; id: ClientId; cl: Client) {.async.} =
         
         case pack.kind:
         of Position:
+          cl.player.transform = pack.posTransform
           await sendToAllExcept(se, id, initPosition(pack.posId, pack.posTransform))
         of Talk:
           await sendToAll(se, initTalk(pack.msg))
