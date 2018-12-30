@@ -4,6 +4,7 @@ import
 const
   # Server
   logFile* = "log.txt"
+  nickFile* = "nicks.txt"
 
   # Game
   dayLength* = 600

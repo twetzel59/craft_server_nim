@@ -1,6 +1,6 @@
 import
   std / [ asyncdispatch, asyncnet, options, tables, times ],
-  client, common, logging, packet
+  client, common, logging, nicks, packet
 
 const
   craftPort = Port(4080)
@@ -8,16 +8,18 @@ const
 type
   Server = ref object
     log: Logger
+    nicks: NickManager
     socket: AsyncSocket
     clients: Table[ClientId, Client]
     idGen: IdGenerator
 
-func newServer(log: Logger; servSocket: AsyncSocket): Server =
+func newServer(log: Logger; nickMgr: NickManager; servSocket: AsyncSocket): Server =
   Server(
     log: log,
+    nicks: nickMgr,
     socket: servSocket,
     clients: initTable[ClientId, Client](),
-    idGen: initIdGenerator()
+    idGen: initIdGenerator(),
   )
 
 proc sendToAllImpl(se: Server; ignore: Option[ClientId]; pack: Packet) {.async.} =
@@ -145,11 +147,21 @@ proc serverLoop(se: Server) {.async.} =
     asyncCheck clientLoop(se, id, client)
 
 proc main() =
+  # TODO: Clean exit is not yet supported, and files
+  # are not cleaned up. Once chat commands are supported,
+  # add /stop command to stop gracefully and close files.
+
   # Initialize the logger. The log file will be created if
   # it doesn't exist. Set the logger to close when the
-  # server exits.
-  let log = newLogger(logFile)
+  # server exits cleanly.
+  let log = newLogger logFile
   defer: close log
+
+  # Create the nickname manager. The nickname file will
+  # be created if it doesn't exist. The nickmanager will
+  # close when the server exits cleanly.
+  let nickMgr = get newNickManager(log, nickFile)
+  defer: close nickMgr
 
   # Create the server's socket, and allow reuse of the address to
   # prevent annoying "Address already in use" errors.
@@ -157,7 +169,7 @@ proc main() =
   setSockOpt socket, OptReuseAddr, true
 
   # Create a new Server and start the main listening loop.
-  let se = newServer(log, socket)
+  let se = newServer(log, nickMgr, socket)
   waitFor serverLoop se
 
 when isMainModule:
